@@ -1,84 +1,188 @@
-
 "use client";
 
-import { useAccount } from "wagmi";
+import { useState } from "react";
 import { Address } from "@scaffold-ui/components";
 import type { NextPage } from "next";
-import { hardhat } from "viem/chains";
-import Link from "next/link";
-import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { useTargetNetwork } from "~~/hooks/scaffold-eth";
+import { useAccount } from "wagmi";
+import { useScaffoldEventHistory } from "~~/hooks/scaffold-eth/useScaffoldEventHistory";
+import { useScaffoldReadContract } from "~~/hooks/scaffold-eth/useScaffoldReadContract";
+import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth/useScaffoldWriteContract";
+import { getParsedError, notification } from "~~/utils/scaffold-eth";
 
+const CONTRACT_ADDRESS = "0x8EfF6404B69aa8784404c98C55a778Df31a1E7A3";
 
 const Home: NextPage = () => {
-  const { address: connectedAddress } = useAccount();
-  const { targetNetwork } = useTargetNetwork();
+  const { isConnected } = useAccount();
+  const [newGreeting, setNewGreeting] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitCooldown, setSubmitCooldown] = useState(false);
+
+  // Read current greeting
+  const { data: currentGreeting, refetch: refetchGreeting } = useScaffoldReadContract({
+    contractName: "HelloWorld",
+    functionName: "greeting",
+  });
+
+  // Write contract hook
+  const { writeContractAsync, isPending } = useScaffoldWriteContract({
+    contractName: "HelloWorld",
+  });
+
+  // Read greeting history events
+  const { data: greetingEvents, isLoading: isLoadingEvents } = useScaffoldEventHistory({
+    contractName: "HelloWorld",
+    eventName: "GreetingChanged",
+    fromBlock: 44665006n,
+    watch: true,
+    blockData: true,
+  });
+
+  // Handle set greeting
+  const handleSetGreeting = async () => {
+    if (!newGreeting.trim()) {
+      notification.warning("Please enter a greeting.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const loadingToast = notification.loading("Submitting transaction...");
+
+    try {
+      await writeContractAsync({
+        functionName: "setGreeting",
+        args: [newGreeting],
+      });
+
+      notification.remove(loadingToast);
+      notification.success("Greeting updated successfully!");
+      setNewGreeting("");
+      setSubmitCooldown(true);
+
+      // Refetch after a brief delay to let the chain confirm
+      setTimeout(() => {
+        refetchGreeting();
+      }, 2000);
+
+      // Cooldown period to prevent spam
+      setTimeout(() => {
+        setSubmitCooldown(false);
+      }, 4000);
+    } catch (e: any) {
+      notification.remove(loadingToast);
+      const parsedError = getParsedError(e);
+      notification.error(parsedError);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const isButtonDisabled = isSubmitting || isPending || submitCooldown || !newGreeting.trim() || !isConnected;
 
   return (
-    <>
-      <div className="flex items-center flex-col grow pt-10">
-        <div className="px-5">
-          <h1 className="text-center">
-            <span className="block text-2xl mb-2">Welcome to</span>
-            <span className="block text-4xl font-bold">Scaffold-ETH 2</span>
-            
-          </h1>
-          <div className="flex justify-center items-center space-x-2 flex-col">
-            <p className="my-2 font-medium">Connected Address:</p>
-            <Address
-              address={connectedAddress}
-              chain={targetNetwork}
-              blockExplorerAddressLink={
-                targetNetwork.id === hardhat.id ? `/blockexplorer/address/${connectedAddress}` : undefined
-              }
-            />
-          </div>
-          
-<p className="text-center text-lg">
-  Get started by editing{" "}
-  <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-    packages/nextjs/app/page.tsx
-  </code>
-</p>
-<p className="text-center text-lg">
-  Edit your smart contract{" "}
-  <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-    YourContract.sol
-  </code>{" "}
-  in{" "}
-  <code className="italic bg-base-300 text-base font-bold max-w-full break-words break-all inline-block">
-    packages/hardhat/contracts
-  </code>
-</p>
+    <div className="flex items-center flex-col grow pt-10 px-4">
+      <div className="max-w-2xl w-full">
+        {/* Header */}
+        <h1 className="text-center text-4xl font-bold mb-2">Hello World</h1>
+        <p className="text-center text-base-content/70 mb-8">A simple on-chain greeting on Base</p>
 
+        {/* Contract address */}
+        <div className="flex justify-center items-center gap-2 mb-8">
+          <span className="text-sm text-base-content/60">Contract:</span>
+          <Address address={CONTRACT_ADDRESS} />
         </div>
 
-        <div className="grow bg-base-300 w-full mt-16 px-8 py-12">
-          <div className="flex justify-center items-center gap-12 flex-col md:flex-row">
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <BugAntIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Tinker with your smart contract using the{" "}
-                <Link href="/debug" passHref className="link">
-                  Debug Contracts
-                </Link>{" "}
-                tab.
-              </p>
+        {/* Current greeting card */}
+        <div className="card bg-base-100 shadow-xl mb-8">
+          <div className="card-body items-center text-center">
+            <h2 className="card-title text-lg text-base-content/60">Current Greeting</h2>
+            <p className="text-2xl font-semibold break-words w-full">
+              {currentGreeting !== undefined ? (
+                `"${currentGreeting}"`
+              ) : (
+                <span className="loading loading-dots loading-md"></span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Set greeting form */}
+        <div className="card bg-base-100 shadow-xl mb-8">
+          <div className="card-body">
+            <h2 className="card-title text-lg text-base-content/60">Set New Greeting</h2>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                placeholder="Enter your greeting..."
+                className="input input-bordered flex-1"
+                value={newGreeting}
+                onChange={e => setNewGreeting(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !isButtonDisabled) {
+                    handleSetGreeting();
+                  }
+                }}
+                disabled={!isConnected}
+              />
+              <button className="btn btn-primary" onClick={handleSetGreeting} disabled={isButtonDisabled}>
+                {isSubmitting || isPending ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm"></span>
+                    Setting...
+                  </>
+                ) : submitCooldown ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm"></span>
+                    Confirming...
+                  </>
+                ) : (
+                  "Set Greeting"
+                )}
+              </button>
             </div>
-            <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-xs rounded-3xl">
-              <MagnifyingGlassIcon className="h-8 w-8 fill-secondary" />
-              <p>
-                Explore your local transactions with the{" "}
-                <Link href="/blockexplorer" passHref className="link">
-                  Block Explorer
-                </Link>{" "}
-                tab.
-              </p>
-            </div>
+            {!isConnected && (
+              <p className="text-sm text-base-content/50 mt-2">Connect your wallet to set a greeting.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Greeting history */}
+        <div className="card bg-base-100 shadow-xl mb-8">
+          <div className="card-body">
+            <h2 className="card-title text-lg text-base-content/60">Greeting History</h2>
+            {isLoadingEvents ? (
+              <div className="flex justify-center py-4">
+                <span className="loading loading-spinner loading-md"></span>
+              </div>
+            ) : greetingEvents && greetingEvents.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Sender</th>
+                      <th>Greeting</th>
+                      <th>Block</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {greetingEvents.slice(0, 20).map((event, index) => (
+                      <tr key={`${event.transactionHash}-${event.logIndex}-${index}`}>
+                        <td>
+                          <Address address={event.args?.sender} />
+                        </td>
+                        <td className="break-words max-w-[200px]">{event.args?.newGreeting}</td>
+                        <td className="text-base-content/60">{event.blockNumber?.toString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-center text-base-content/50 py-4">No greeting events found yet.</p>
+            )}
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
