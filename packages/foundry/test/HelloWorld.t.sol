@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
 import "../contracts/HelloWorld.sol";
@@ -53,6 +53,19 @@ contract HelloWorldTest is Test {
         }
         vm.expectRevert("too long");
         helloWorld.setGreeting(string(tooLong));
+    }
+
+    /// @notice Fuzz: setGreeting succeeds for inputs <= 280 bytes and reverts for > 280 bytes
+    function testFuzz_SetGreetingLengthBoundary(bytes memory input) public {
+        vm.assume(input.length <= 400);
+        string memory s = string(input);
+        if (input.length <= 280) {
+            helloWorld.setGreeting(s);
+            assertEq(helloWorld.greeting(), s);
+        } else {
+            vm.expectRevert("too long");
+            helloWorld.setGreeting(s);
+        }
     }
 
     /// @notice Two different senders can both update the greeting (no access control)

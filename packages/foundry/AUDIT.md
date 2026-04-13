@@ -51,6 +51,8 @@
 **Proof of Concept:** No direct exploit. The risk is that compiling with an older 0.8.x version could expose known compiler bugs, or that a future compiler within range could change codegen behavior. This is a latent risk, not an active vulnerability.
 **Recommendation:** Pin the contract to a specific tested version, e.g., `pragma solidity 0.8.26;` (or match the deploy script's `^0.8.19` at minimum). Align all three files (contract, deploy script, tests) to the same pragma.
 
+**Status:** Fixed -- pragma changed to `^0.8.19` in both `HelloWorld.sol` and `HelloWorld.t.sol`, matching the deploy scripts.
+
 ---
 
 ### [I-1] No fuzz testing for setGreeting boundary
@@ -73,6 +75,8 @@ function testFuzz_setGreeting(string memory input) public {
 }
 ```
 
+**Status:** Fixed -- added `testFuzz_SetGreetingLengthBoundary(bytes)` to `HelloWorld.t.sol`. Bounds input to [0, 400] bytes; asserts success for <=280 and revert for >280. 256 fuzz runs pass.
+
 ---
 
 ### [I-2] Length guard is byte-based, not character-based
@@ -84,6 +88,8 @@ function testFuzz_setGreeting(string memory input) public {
 **Proof of Concept:** A user submitting 280 emoji characters (4 bytes each = 1120 bytes) would be rejected. This is safe and intentional.
 **Recommendation:** No code change needed. If desired, update the job spec to say "280 bytes" instead of "280 chars" for precision.
 
+**Status:** Documented -- added `@dev` natspec comment on `setGreeting` clarifying the 280 limit is in bytes, not UTF-8 characters, and that this is intentional to bound storage cost. No logic change.
+
 ---
 
 ### [I-3] foundry.toml uses public RPC endpoint for Base
@@ -94,6 +100,8 @@ function testFuzz_setGreeting(string memory input) public {
 **Description:** The foundry configuration uses the public Base RPC `https://mainnet.base.org` instead of an Alchemy endpoint. Per project policy (CLAUDE.md), all chain calls should use Alchemy RPC with an API key. This is a project configuration concern, not a contract security issue. It does not affect the deployed contract's behavior.
 **Proof of Concept:** N/A -- no on-chain impact.
 **Recommendation:** Change to `base = "https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"` in `foundry.toml`.
+
+**Status:** Fixed -- `base` and `baseSepolia` RPC entries in `foundry.toml` now use `${ALCHEMY_API_KEY}` interpolation, matching all other Alchemy entries in the file.
 
 ---
 

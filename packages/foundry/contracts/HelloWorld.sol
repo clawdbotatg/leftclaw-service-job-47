@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.19;
 
 /// @title HelloWorld
 /// @notice A simple greeting contract — anyone can read or update the greeting.
@@ -20,6 +20,7 @@ contract HelloWorld {
 
     /// @notice Replace the current greeting.
     /// @param _newGreeting The new greeting (max 280 bytes to prevent griefing).
+    /// @dev The 280 limit is in bytes, not UTF-8 characters. Multi-byte characters (emoji, CJK) consume more than 1 byte each, so fewer than 280 characters may be allowed. This is intentional — it bounds actual storage cost.
     function setGreeting(string memory _newGreeting) public {
         require(bytes(_newGreeting).length <= 280, "too long");
         greeting = _newGreeting;
