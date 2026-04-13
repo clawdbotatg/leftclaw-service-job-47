@@ -27,6 +27,7 @@ Stage 8 has real work to do: the "Set Greeting" button lacks a proper wrong-netw
 **Status:** FAIL
 **Evidence:** SE2's `WrongNetworkDropdown` (`RainbowKitCustomConnectButton/index.tsx:41-42`) shows a "Wrong network" dropdown in the header with network options. However, the main "Set Greeting" button in `app/page.tsx:126` does NOT check `useChainId() === targetNetwork.id`. When connected on the wrong chain, the "Set Greeting" button still renders — the user can click it and get a confusing wagmi error instead of seeing a "Switch to Base" button in the primary CTA slot.
 **Notes:** Per QA SKILL.md: "the action button itself must become the switch CTA, or the user clicks Sign/Stake/Deposit on the wrong chain and eats a silent wagmi error." The header dropdown alone is not sufficient. The `Set Greeting` button slot should render a "Switch to Base" button when `chain.id !== targetNetwork.id`.
+**Status (Stage 8):** PASS — Fixed in `app/page.tsx:16-23,131-137`. Added `useTargetNetwork`, `useSwitchChain`, and `chain` from `useAccount`. CTA slot now renders "Switch to {targetNetwork.name}" button when `isOnWrongNetwork` is true, calling `switchChain({ chainId: targetNetwork.id })`. Three-state CTA: not connected (disabled + hint text) / wrong chain (Switch to Base) / correct chain (Set Greeting with cooldown).
 
 ### 3. TX button stays disabled through submit + block confirmation + cooldown
 **Status:** PASS
@@ -135,6 +136,7 @@ Stage 8 has real work to do: the "Set Greeting" button lacks a proper wrong-netw
 **Status:** FAIL
 **Evidence:** `services/web3/wagmiConfig.tsx:20` contains `http()` (bare, no URL) in the `rpcFallbacks` array. Per QA SKILL.md: "Bare `http()` fallback removed; only intended configured transports remain." The bare `http()` silently hits public RPCs in parallel, causing rate limits.
 **Notes:** Remove the bare `http()` from the fallback array. This is an SE2 default that should be cleaned up for production.
+**Status (Stage 8):** PASS — Fixed in `services/web3/wagmiConfig.tsx:22`. Removed bare `http()` from `rpcFallbacks` array. Only explicit Alchemy and BuidlGuidl RPC transports remain. `grep -rn "http()" packages/nextjs/services/web3/` returns zero matches.
 
 ### H. `pollingInterval` set correctly
 **Status:** PASS

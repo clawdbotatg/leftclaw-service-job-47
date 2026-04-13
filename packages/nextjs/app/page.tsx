@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Address } from "@scaffold-ui/components";
 import type { NextPage } from "next";
-import { useAccount } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
+import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 import { useScaffoldEventHistory } from "~~/hooks/scaffold-eth/useScaffoldEventHistory";
 import { useScaffoldReadContract } from "~~/hooks/scaffold-eth/useScaffoldReadContract";
 import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth/useScaffoldWriteContract";
@@ -12,10 +13,14 @@ import { getParsedError, notification } from "~~/utils/scaffold-eth";
 const CONTRACT_ADDRESS = "0x8EfF6404B69aa8784404c98C55a778Df31a1E7A3";
 
 const Home: NextPage = () => {
-  const { isConnected } = useAccount();
+  const { isConnected, chain } = useAccount();
+  const { targetNetwork } = useTargetNetwork();
+  const { switchChain } = useSwitchChain();
   const [newGreeting, setNewGreeting] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitCooldown, setSubmitCooldown] = useState(false);
+
+  const isOnWrongNetwork = isConnected && chain?.id !== targetNetwork.id;
 
   // Read current greeting
   const { data: currentGreeting, refetch: refetchGreeting } = useScaffoldReadContract({
@@ -123,21 +128,27 @@ const Home: NextPage = () => {
                 }}
                 disabled={!isConnected}
               />
-              <button className="btn btn-primary" onClick={handleSetGreeting} disabled={isButtonDisabled}>
-                {isSubmitting || isPending ? (
-                  <>
-                    <span className="loading loading-spinner loading-sm"></span>
-                    Setting...
-                  </>
-                ) : submitCooldown ? (
-                  <>
-                    <span className="loading loading-spinner loading-sm"></span>
-                    Confirming...
-                  </>
-                ) : (
-                  "Set Greeting"
-                )}
-              </button>
+              {isOnWrongNetwork ? (
+                <button className="btn btn-warning" onClick={() => switchChain?.({ chainId: targetNetwork.id })}>
+                  Switch to {targetNetwork.name}
+                </button>
+              ) : (
+                <button className="btn btn-primary" onClick={handleSetGreeting} disabled={isButtonDisabled}>
+                  {isSubmitting || isPending ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      Setting...
+                    </>
+                  ) : submitCooldown ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      Confirming...
+                    </>
+                  ) : (
+                    "Set Greeting"
+                  )}
+                </button>
+              )}
             </div>
             {!isConnected && (
               <p className="text-sm text-base-content/50 mt-2">Connect your wallet to set a greeting.</p>
